@@ -29,9 +29,9 @@ public class TrainQFunction {
 
     private static int batchSize = 16;
     private static int hiddenNeurons = 20;
-    private static double learningRate = 1e-3;
+    private static double learningRate = 1e-4;
     private static int seed = 147;
-    private static int epochs = 100;
+    private static int epochs = 200;
     private static double trainingPercentage = 1.0;
 
     /*
@@ -41,10 +41,11 @@ public class TrainQFunction {
     We assume that the first column in the file is the target value
      */
     public static void main(String[] args) {
-        if (args.length != 2) throw new AssertionError("Need two arguments for input and output locations");
+        if (args.length != 3) throw new AssertionError("Need three arguments for input and output locations, plus number of categories");
 
         String inputLocation = args[0];
         String outputLocation = args[1];
+        int numberOfRules = Integer.valueOf(args[2]);
 
         RecordReader recordReader = new CSVRecordReader('\t');
         try {
@@ -52,7 +53,6 @@ public class TrainQFunction {
         } catch (Exception e) {
             throw new AssertionError("Error processing file " + inputLocation + ":\n" + e.toString());
         }
-        int numberOfRules = 9;
 
         System.out.println("Starting...");
         List<List<Writable>> allData = new ArrayList<>();
@@ -80,16 +80,16 @@ public class TrainQFunction {
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
                 .seed(seed)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-                .l2(1e-6)
+                .l1(1e-5)
                 .updater(new Nesterovs(learningRate, 0.9))
                 .list()
                 .layer(0, new DenseLayer.Builder().nIn(iterator.inputColumns()).nOut(hiddenNeurons)
                         .weightInit(WeightInit.XAVIER)
-                        .activation(Activation.RECTIFIEDTANH)
-                        .build())
-                .layer(1, new OutputLayer.Builder(LossFunctions.LossFunction.COSINE_PROXIMITY)
-                        .weightInit(WeightInit.XAVIER)
                         .activation(Activation.RELU)
+                        .build())
+                .layer(1, new OutputLayer.Builder(LossFunctions.LossFunction.L2)
+                        .weightInit(WeightInit.XAVIER)
+                        .activation(Activation.RECTIFIEDTANH)
                         .nIn(hiddenNeurons).nOut(numberOfRules).build())
                 .pretrain(false).backprop(true).build();
 
@@ -122,7 +122,9 @@ public class TrainQFunction {
             serializer.write(normalizer, outputLocation + ".normal");
         } catch (Exception e) {
             throw new AssertionError("Error writing file " + outputLocation + ".normal:\n" + e.toString());
-
         }
+
+        HopshackleNN asHopshackle = new HopshackleNN(model, normalizer);
+        asHopshackle.writeToFile(outputLocation.replaceAll(".model", ".params"));
     }
 }

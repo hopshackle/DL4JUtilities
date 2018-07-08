@@ -31,11 +31,16 @@ import java.util.List;
 public class TrainEvalFunction {
 
     private static int batchSize = 16;
-    private static int hiddenNeurons = 5;
-    private static double learningRate = 1e-3;
-    private static int seed = 45;
-    private static int epochs = 50;
+    private static int hiddenNeurons = 30;
+    private static double learningRate = 1e-4;
+    private static int seed = 4536832;
+    private static int epochs = 300;
+    private static double momentum = 0.9;
     private static double trainingPercentage = 1.0;
+    private static double regularisationL1 = 0.0;
+    private static double regularisationL2 = 1e-6;
+    private static Activation hiddenActivation = Activation.RELU;
+    private static Activation outputActivation = Activation.RECTIFIEDTANH;
 
     /*
     Takes a file as an argument, and then uses this to train a simple Neural Network
@@ -44,7 +49,16 @@ public class TrainEvalFunction {
     We assume that the first column in the file is the target value
      */
     public static void main(String[] args) {
-        if (args.length != 2) throw new AssertionError("Need two arguments for input and output locations");
+        if (args.length < 2) throw new AssertionError("Need two arguments for input and output locations");
+        if (args.length > 2) epochs = Integer.valueOf(args[2]);
+        if (args.length > 3) batchSize = Integer.valueOf(args[3]);
+        if (args.length > 4) momentum = Double.valueOf(args[4]);
+        if (args.length > 5) learningRate = Double.valueOf(args[5]);
+        if (args.length > 6) hiddenNeurons = Integer.valueOf(args[6]);
+        if (args.length > 7) regularisationL1 = Double.valueOf(args[7]);
+        if (args.length > 8) regularisationL2 = Double.valueOf(args[8]);
+        if (args.length > 9) hiddenActivation = getActivation(args[9], hiddenActivation);
+        if (args.length > 10) outputActivation = getActivation(args[10], outputActivation);
 
         String inputLocation = args[0];
         String outputLocation = args[1];
@@ -83,16 +97,17 @@ public class TrainEvalFunction {
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
                 .seed(seed)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-                .l2(1e-4)
-                .updater(new Nesterovs(learningRate, 0.3))
+                .l2(regularisationL2)
+                .l1(regularisationL1)
+                .updater(new Nesterovs(learningRate, momentum))
                 .list()
                 .layer(0, new DenseLayer.Builder().nIn(iterator.inputColumns()).nOut(hiddenNeurons)
                         .weightInit(WeightInit.XAVIER)
-                        .activation(Activation.RECTIFIEDTANH)
+                        .activation(hiddenActivation)
                         .build())
                 .layer(1, new OutputLayer.Builder(LossFunctions.LossFunction.L2)
                         .weightInit(WeightInit.XAVIER)
-                        .activation(Activation.RELU)
+                        .activation(outputActivation)
                         .nIn(hiddenNeurons).nOut(1).build())
                 .pretrain(false).backprop(true).build();
 
@@ -107,7 +122,7 @@ public class TrainEvalFunction {
         for (int n = 0; n < epochs; n++) {
             model.fit(iterator);
             double testScore = (testData.size() > 0) ? model.score(testDataSet) : Double.NaN;
-            System.out.println(String.format("Epoch %3d has error %.4f, and test error %.4f", n, model.score(), testScore));
+            System.out.println(String.format("Epoch %3d has error %.5f, and test error %.5f", n, model.score(), testScore));
         }
 
         //Save the model
@@ -126,7 +141,23 @@ public class TrainEvalFunction {
             serializer.write(normalizer, outputLocation + ".normal");
         } catch (Exception e) {
             throw new AssertionError("Error writing file " + outputLocation + ".normal:\n" + e.toString());
-
         }
+
+        HopshackleNN asHopshackle = new HopshackleNN(model, normalizer);
+        asHopshackle.writeToFile(outputLocation.replaceAll(".model", ".params"));
+    }
+
+    private static Activation getActivation(String type, Activation defaultOption) {
+        switch (type) {
+            case "RELU":
+                return Activation.RELU;
+            case "RECTIFIEDTANH":
+                return Activation.RECTIFIEDTANH;
+            case "ELU":
+                return Activation.ELU;
+            case "SIGMOID":
+                return Activation.SIGMOID;
+        }
+        return defaultOption;
     }
 }
