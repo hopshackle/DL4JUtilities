@@ -5,12 +5,13 @@ import org.nd4j.linalg.dataset.api.preprocessor.NormalizerStandardize;
 import com.google.gson.*;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 public class HopshackleNN {
 
     enum ACTIVATION {
-        RELU, RECTIFIED_TANH
+        RELU, RECTIFIED_TANH, SOFTMAX
     }
 
     private ACTIVATION[] layers;
@@ -30,7 +31,7 @@ public class HopshackleNN {
         layers = new ACTIVATION[numberOfLayers];
         inputsByLayer = new int[numberOfLayers];
         outputsByLayer = new int[numberOfLayers];
-        layers = new ACTIVATION[]{ACTIVATION.RECTIFIED_TANH, ACTIVATION.RELU};
+        layers = new ACTIVATION[]{ACTIVATION.RELU, ACTIVATION.RECTIFIED_TANH};
         // hard-coded for the moment, as there is no easy way to pull this from the model
         weightsByLayerNeuronAndInput = new double[numberOfLayers][][];
         biasByLayerAndNeuron = new double[numberOfLayers][];
@@ -77,6 +78,7 @@ public class HopshackleNN {
         }
     }
 
+
     public double[] process(double[] data) {
         if (data.length != inputsByLayer[0])
             throw new AssertionError("Must have " + inputsByLayer[0] + " inputs instead of " + data.length);
@@ -101,9 +103,17 @@ public class HopshackleNN {
                     case RECTIFIED_TANH:
                         activation = Math.max(0, Math.tanh(activation));
                         break;
+                    case SOFTMAX:
+                        activation = Math.exp(activation);
+                        break;
                     default:
                 }
                 activationsByLayerAndNeuron[layer][neuron] = activation;
+            }
+            if (layers[layer] == ACTIVATION.SOFTMAX) {
+                // whole layer is linked
+                double totalActivation = Arrays.stream(activationsByLayerAndNeuron[layer]).sum();
+                for (int i = 0; i < activationsByLayerAndNeuron[layer].length; i++) activationsByLayerAndNeuron[layer][i] /= totalActivation;
             }
             input = activationsByLayerAndNeuron[layer]; // the input to the next layer
         }

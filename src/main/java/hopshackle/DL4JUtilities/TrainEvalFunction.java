@@ -33,7 +33,6 @@ public class TrainEvalFunction {
     private static int batchSize = 16;
     private static int hiddenNeurons = 30;
     private static double learningRate = 1e-4;
-    private static int seed = 4536832;
     private static int epochs = 300;
     private static double momentum = 0.9;
     private static double trainingPercentage = 1.0;
@@ -95,7 +94,6 @@ public class TrainEvalFunction {
 
         System.out.println(String.format("Completed pre-processing. %d training records and %d test records.", trainData.size(), testData.size()));
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
-                .seed(seed)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
                 .l2(regularisationL2)
                 .l1(regularisationL1)
@@ -147,7 +145,7 @@ public class TrainEvalFunction {
         asHopshackle.writeToFile(outputLocation.replaceAll(".model", ".params"));
     }
 
-    private static Activation getActivation(String type, Activation defaultOption) {
+    public static Activation getActivation(String type, Activation defaultOption) {
         switch (type) {
             case "RELU":
                 return Activation.RELU;
@@ -157,6 +155,8 @@ public class TrainEvalFunction {
                 return Activation.ELU;
             case "SIGMOID":
                 return Activation.SIGMOID;
+            case "SOFTMAX":
+                return Activation.SOFTMAX;
         }
         return defaultOption;
     }

@@ -29,10 +29,14 @@ public class TrainQFunction {
 
     private static int batchSize = 16;
     private static int hiddenNeurons = 20;
-    private static double learningRate = 1e-4;
-    private static int seed = 147;
+    private static double learningRate = 1e-5;
     private static int epochs = 200;
     private static double trainingPercentage = 1.0;
+    private static double momentum = 0.9;
+    private static double regularisationL1 = 0.0;
+    private static double regularisationL2 = 1e-6;
+    private static Activation hiddenActivation = Activation.RELU;
+    private static Activation outputActivation = Activation.RECTIFIEDTANH;
 
     /*
     Takes a file as an argument, and then uses this to train a simple Neural Network
@@ -41,11 +45,20 @@ public class TrainQFunction {
     We assume that the first column in the file is the target value
      */
     public static void main(String[] args) {
-        if (args.length != 3) throw new AssertionError("Need three arguments for input and output locations, plus number of categories");
-
+        if (args.length < 3) throw new AssertionError("Need three arguments for input and output locations, plus number of categories");
         String inputLocation = args[0];
         String outputLocation = args[1];
         int numberOfRules = Integer.valueOf(args[2]);
+        if (args.length > 3) epochs = Integer.valueOf(args[3]);
+        if (args.length > 4) batchSize = Integer.valueOf(args[4]);
+        if (args.length > 5) momentum = Double.valueOf(args[5]);
+        if (args.length > 6) learningRate = Double.valueOf(args[6]);
+        if (args.length > 7) hiddenNeurons = Integer.valueOf(args[7]);
+        if (args.length > 8) regularisationL1 = Double.valueOf(args[8]);
+        if (args.length > 9) regularisationL2 = Double.valueOf(args[9]);
+        if (args.length > 10) hiddenActivation = TrainEvalFunction.getActivation(args[10], hiddenActivation);
+        if (args.length > 11) outputActivation = TrainEvalFunction.getActivation(args[11], outputActivation);
+        if (args.length > 12) trainingPercentage = Double.valueOf(args[12]);
 
         RecordReader recordReader = new CSVRecordReader('\t');
         try {
@@ -66,7 +79,7 @@ public class TrainQFunction {
         CollectionRecordReader crrTrain = new CollectionRecordReader(trainData);
         CollectionRecordReader crrTest = new CollectionRecordReader(testData);
 
-  //     DataSetIterator iterator = new RecordReaderDataSetIterator(recordReader, batchSize, 0, numberOfRules - 1, true);
+        //     DataSetIterator iterator = new RecordReaderDataSetIterator(recordReader, batchSize, 0, numberOfRules - 1, true);
         DataSetIterator iterator = new RecordReaderDataSetIterator(crrTrain, batchSize, 0, numberOfRules - 1, true);
 
         NormalizerStandardize normalizer = new NormalizerStandardize();
@@ -78,19 +91,20 @@ public class TrainQFunction {
 
         System.out.println("Completed pre-processing...");
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
-                .seed(seed)
+                .weightInit(WeightInit.XAVIER)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-                .l1(1e-5)
-                .updater(new Nesterovs(learningRate, 0.9))
+                .l1(regularisationL1)
+                .l2(regularisationL2)
+                .updater(new Nesterovs(learningRate, momentum))
                 .list()
                 .layer(0, new DenseLayer.Builder().nIn(iterator.inputColumns()).nOut(hiddenNeurons)
-                        .weightInit(WeightInit.XAVIER)
-                        .activation(Activation.RELU)
+                        .activation(hiddenActivation)
                         .build())
-                .layer(1, new OutputLayer.Builder(LossFunctions.LossFunction.L2)
-                        .weightInit(WeightInit.XAVIER)
-                        .activation(Activation.RECTIFIEDTANH)
-                        .nIn(hiddenNeurons).nOut(numberOfRules).build())
+                .layer(1, new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD) //create hidden layer
+                        .activation(outputActivation)
+                        .nIn(hiddenNeurons)
+                        .nOut(numberOfRules)
+                        .build())
                 .pretrain(false).backprop(true).build();
 
 
@@ -99,11 +113,12 @@ public class TrainQFunction {
         model.init();
 
         DataSet testDataSet = testData.isEmpty() ? null : ((RecordReaderDataSetIterator) testIterator).next();
-        if (testData.size() > 0) System.out.println(String.format("Before training the test error is %.3f", model.score(testDataSet)));
+        if (testData.size() > 0)
+            System.out.println(String.format("Before training the test error is %.3f", model.score(testDataSet)));
         for (int n = 0; n < epochs; n++) {
             model.fit(iterator);
             double testScore = (testDataSet != null) ? model.score(testDataSet) : Double.NaN;
-            System.out.println(String.format("Epoch %3d has error %.3f, and test error %.3f", n, model.score(), testScore));
+            System.out.println(String.format("Epoch %3d has error %.4f, and test error %.4f", n, model.score(), testScore));
         }
 
         //Save the model
