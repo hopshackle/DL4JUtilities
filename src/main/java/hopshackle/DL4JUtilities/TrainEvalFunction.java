@@ -36,8 +36,8 @@ public class TrainEvalFunction {
     private static int epochs = 300;
     private static double momentum = 0.9;
     private static double trainingPercentage = 1.0;
-    private static double regularisationL1 = 0.0;
-    private static double regularisationL2 = 1e-6;
+    private static double regularisationL1 = 1e-5;
+    private static double regularisationL2 = 0.0;
     private static Activation hiddenActivation = Activation.RELU;
     private static Activation outputActivation = Activation.RECTIFIEDTANH;
 
@@ -61,6 +61,11 @@ public class TrainEvalFunction {
 
         String inputLocation = args[0];
         String outputLocation = args[1];
+        if (!outputLocation.endsWith(".model")) {
+            System.out.println("Replacing suffix with .model");
+            int lastPeriod = outputLocation.lastIndexOf('.');
+            outputLocation = outputLocation.substring(0, lastPeriod) + ".model";
+        }
 
         RecordReader recordReader = new CSVRecordReader('\t');
         try {
