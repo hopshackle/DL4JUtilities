@@ -48,6 +48,11 @@ public class TrainQFunction {
         if (args.length < 3) throw new AssertionError("Need three arguments for input and output locations, plus number of categories");
         String inputLocation = args[0];
         String outputLocation = args[1];
+        if (!outputLocation.endsWith(".model")) {
+            System.out.println("Replacing suffix with .model");
+            int lastPeriod = outputLocation.lastIndexOf('.');
+            outputLocation = outputLocation.substring(0, lastPeriod) + ".model";
+        }
         int numberOfRules = Integer.valueOf(args[2]);
         if (args.length > 3) epochs = Integer.valueOf(args[3]);
         if (args.length > 4) batchSize = Integer.valueOf(args[4]);
@@ -89,7 +94,7 @@ public class TrainQFunction {
         DataSetIterator testIterator = new RecordReaderDataSetIterator(crrTest, testData.size(), 0, numberOfRules - 1, true);
         testIterator.setPreProcessor(normalizer); // then set this to pre-process the test data too!
 
-        System.out.println("Completed pre-processing...");
+        System.out.println(String.format("Completed pre-processing. %d training records and %d test records.", trainData.size(), testData.size()));
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
                 .weightInit(WeightInit.XAVIER)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
@@ -112,7 +117,7 @@ public class TrainQFunction {
         MultiLayerNetwork model = new MultiLayerNetwork(conf);
         model.init();
 
-        DataSet testDataSet = testData.isEmpty() ? null : ((RecordReaderDataSetIterator) testIterator).next();
+        DataSet testDataSet = testData.isEmpty() ? null : testIterator.next();
         if (testData.size() > 0)
             System.out.println(String.format("Before training the test error is %.3f", model.score(testDataSet)));
         for (int n = 0; n < epochs; n++) {
